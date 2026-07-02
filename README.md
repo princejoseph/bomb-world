@@ -2,6 +2,8 @@
 
 A silly cartoon mission game that runs in a single HTML file. Find the best bomb, sneak into the enemy base, and blow it up. 🏆
 
+Vibe coded live from my 8-year-old's real-time ideas — he called the shots, the AI wrote the code. 👦🎮
+
 **Play it now:** https://bombworld.fly.dev
 
 ## How to play
