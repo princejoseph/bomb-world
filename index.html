@@ -1,0 +1,1631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>💣 Bomb World</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Comic Sans MS', 'Chalkboard SE', cursive;
+      background: #1a1a2e;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .screen.active { display: flex; }
+
+    /* ── Animations ── */
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50%       { transform: translateY(-20px) scale(1.05); }
+    }
+    @keyframes explode {
+      0%   { transform: scale(0); opacity: 0.9; }
+      100% { transform: scale(12); opacity: 0; }
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0) translateY(0); }
+      20%       { transform: translateX(-12px) translateY(4px); }
+      40%       { transform: translateX(12px) translateY(-4px); }
+      60%       { transform: translateX(-8px) translateY(4px); }
+      80%       { transform: translateX(8px) translateY(-2px); }
+    }
+    @keyframes fall {
+      0%   { top: -80px; opacity: 1; }
+      80%  { top: 52%; opacity: 1; }
+      100% { top: 55%; opacity: 0; transform: scale(2); }
+    }
+    @keyframes confetti-fall {
+      0%   { transform: translateY(-120px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+    @keyframes flash {
+      0%, 100% { opacity: 0; }
+      50%       { opacity: 1; }
+    }
+    @keyframes pulse-btn {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,200,0,0.6); }
+      50%       { transform: scale(1.06); box-shadow: 0 0 0 18px rgba(255,200,0,0); }
+    }
+    @keyframes wiggle {
+      0%,100% { transform: rotate(0deg); }
+      25%      { transform: rotate(-8deg); }
+      75%      { transform: rotate(8deg); }
+    }
+    @keyframes power-fill {
+      from { width: 0%; }
+    }
+
+    /* ── Screen 1: Title ── */
+    #screen-title { background: linear-gradient(160deg, #0f0c29, #302b63, #24243e); }
+
+    .title-bomb { font-size: 6rem; animation: bounce 1.5s ease-in-out infinite; }
+    .title-text {
+      font-size: clamp(2.5rem, 9vw, 4.5rem);
+      font-weight: 900;
+      background: linear-gradient(90deg, #ff6b6b, #ffd93d, #ff6b6b);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      margin: 0.4em 0;
+    }
+    .title-sub { font-size: 1.2rem; color: #aaa; margin-bottom: 2rem; }
+
+    /* ── Shared button ── */
+    .btn {
+      padding: 16px 40px;
+      font-size: 1.4rem;
+      font-family: inherit;
+      font-weight: 900;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .btn:active { transform: scale(0.93) !important; }
+
+    .btn-play {
+      background: linear-gradient(135deg, #f7971e, #ffd200);
+      color: #222;
+      animation: pulse-btn 2s ease-in-out infinite;
+    }
+    .btn-mission {
+      background: linear-gradient(135deg, #e53935, #ff6b6b);
+      color: #fff;
+      font-size: 1.2rem;
+    }
+    .btn-again {
+      background: linear-gradient(135deg, #11998e, #38ef7d);
+      color: #fff;
+    }
+
+    /* ── Screen 2: Test Range ── */
+    #screen-test { background: linear-gradient(160deg, #1a1a2e, #16213e, #0f3460); position: relative; }
+
+    .test-title { font-size: clamp(1.4rem, 5vw, 2rem); font-weight: 900; color: #ffd93d; margin-bottom: 6px; }
+    .test-sub   { font-size: 0.95rem; color: #aaa; margin-bottom: 20px; }
+
+    .bombs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      width: 100%;
+      max-width: 420px;
+      margin-bottom: 20px;
+    }
+
+    .bomb-card {
+      background: rgba(255,255,255,0.07);
+      border: 2px solid rgba(255,255,255,0.12);
+      border-radius: 20px;
+      padding: 18px 10px 14px;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.2s, background 0.2s;
+      position: relative;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bomb-card:active { transform: scale(0.94); }
+    .bomb-card.tested {
+      border-color: #38ef7d;
+      background: rgba(56,239,125,0.1);
+    }
+    .bomb-card.testing { animation: wiggle 0.15s linear 4; }
+
+    .bomb-emoji { font-size: 2.8rem; display: block; margin-bottom: 6px; }
+    .bomb-name  { font-size: 0.85rem; font-weight: 900; color: #fff; }
+    .bomb-stars { font-size: 0.75rem; letter-spacing: 1px; margin-top: 4px; color: #ffd93d; }
+
+    .tested-badge {
+      position: absolute;
+      top: -8px; right: -8px;
+      background: #38ef7d;
+      color: #111;
+      font-size: 0.65rem;
+      font-weight: 900;
+      border-radius: 50px;
+      padding: 3px 8px;
+      display: none;
+    }
+    .bomb-card.tested .tested-badge { display: block; }
+
+    /* Power meter */
+    .power-meter {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50px;
+      height: 22px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .power-fill {
+      height: 100%;
+      border-radius: 50px;
+      background: linear-gradient(90deg, #f7971e, #ffd200, #ff6b6b);
+      width: 0%;
+      transition: width 0.6s ease;
+    }
+    .power-label { font-size: 0.85rem; color: #aaa; margin-bottom: 16px; }
+
+    /* Target crate area */
+    .crate-area {
+      font-size: 2.5rem;
+      margin-bottom: 14px;
+      position: relative;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .crate { transition: transform 0.1s; display: inline-block; }
+
+    /* Explosion ring */
+    .explosion-ring {
+      position: fixed;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 999;
+      transform: scale(0);
+    }
+
+    .ready-msg {
+      font-size: 1rem;
+      color: #ffd93d;
+      font-weight: 900;
+      min-height: 24px;
+      margin-bottom: 8px;
+    }
+
+    /* ── Screen 2b: Infiltrate ── */
+    #screen-infiltrate {
+      background: #0d0d0d;
+      padding: 12px;
+    }
+    .infil-title { font-size: clamp(1.2rem, 5vw, 1.8rem); font-weight: 900; color: #38ef7d; margin-bottom: 2px; }
+    .infil-sub   { font-size: 0.85rem; color: #888; margin-bottom: 10px; }
+    #base-canvas { display: block; border-radius: 10px; border: 2px solid #444; max-width: 100%; margin-bottom: 10px; }
+
+    /* Controls row (D-pad + fire) */
+    .controls-row { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 416px; padding: 0 8px; }
+    .dpad { display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 58px); gap: 4px; touch-action: none; user-select: none; }
+    .dpad-btn { background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; color: #fff; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
+    .dpad-btn:active, .dpad-btn.pressed { background: rgba(255,255,255,0.3); }
+    .dpad-empty { visibility: hidden; }
+    .fire-btn { width: 86px; height: 86px; background: rgba(231,76,60,0.85); border: 3px solid #ff4444; border-radius: 50%; color: #fff; font-size: 1.6rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; -webkit-tap-highlight-color: transparent; touch-action: none; }
+    .fire-btn:active { transform: scale(0.9); background: #e74c3c; }
+
+    /* ── Screen 2c: Escape ── */
+    #screen-escape { background: #000; gap: 18px; }
+    .esc-title { font-size: clamp(2rem,8vw,3.5rem); font-weight: 900; color: #38ef7d; }
+    .esc-sub   { font-size: 1rem; color: #aaa; }
+    .jet-track { width: 100%; max-width: 420px; height: 90px; overflow: hidden; position: relative; border-top: 1px solid #222; border-bottom: 1px solid #222; }
+    .jet-track canvas { width: 100%; height: 100%; display: block; }
+    #cheat-banner { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(255,215,0,0.92); color: #1a1a2e; font-family: 'Comic Sans MS', cursive; font-size: 1.3rem; font-weight: 900; padding: 10px 24px; border-radius: 30px; z-index: 9999; pointer-events: none; display: none; white-space: nowrap; border: 3px solid #ff9f43; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
+    .esc-countdown { font-size: 1.6rem; font-weight: 900; color: #ff4444; font-family: monospace; letter-spacing: 0.05em; }
+    @keyframes cd-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
+
+    /* ── Screen 3: Mission ── */
+    #screen-mission {
+      background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 50%, #415a77 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mission-title { font-size: clamp(1.5rem, 6vw, 2.2rem); font-weight: 900; color: #ff6b6b; margin-bottom: 4px; }
+    .mission-sub   { font-size: 0.95rem; color: #aaa; margin-bottom: 18px; }
+
+    .base-container {
+      font-size: 2.4rem;
+      line-height: 1.3;
+      margin-bottom: 24px;
+      transition: all 0.3s;
+      min-height: 90px;
+    }
+
+    /* Falling bomb */
+    #falling-bomb {
+      position: fixed;
+      font-size: 3rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      z-index: 500;
+    }
+    #falling-bomb.falling { display: block; animation: fall 1.2s ease-in forwards; }
+
+    /* Flash overlay */
+    #flash-overlay {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 900;
+    }
+    #flash-overlay.flashing { animation: flash 0.3s ease-out 2; }
+
+    /* ── Screen 4: Victory ── */
+    #screen-victory { background: linear-gradient(160deg, #0f2027, #203a43, #2c5364); position: relative; overflow: hidden; }
+
+    .victory-trophy { font-size: 6rem; animation: bounce 1.2s ease-in-out infinite; }
+    .victory-title  { font-size: clamp(1.8rem, 7vw, 3rem); font-weight: 900; color: #ffd93d; margin: 10px 0 6px; }
+    .victory-sub    { font-size: 1.1rem; color: #ccc; margin-bottom: 30px; }
+
+    .confetti-piece {
+      position: fixed;
+      width: 10px;
+      height: 14px;
+      border-radius: 2px;
+      pointer-events: none;
+      z-index: 100;
+      animation: confetti-fall linear forwards;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Screen 1: Title ── -->
+<div id="screen-title" class="screen active">
+  <div class="title-bomb">💣</div>
+  <div class="title-text">BOMB WORLD</div>
+  <div class="title-sub">Find the BEST bomb and destroy the base!</div>
+  <button class="btn btn-play" onclick="showTest()">PLAY! 🚀</button>
+</div>
+
+<!-- ── Screen 2: Test Range ── -->
+<div id="screen-test" class="screen">
+  <div class="test-title">🔬 BOMB TEST RANGE</div>
+  <div class="test-sub">Tap each bomb to test it!</div>
+
+  <div class="crate-area">
+    <span class="crate" id="crate">📦</span>
+  </div>
+
+  <div class="power-meter"><div class="power-fill" id="power-fill"></div></div>
+  <div class="power-label" id="power-label">Test a bomb to see its power!</div>
+
+  <div class="bombs-grid">
+    <div class="bomb-card" id="bomb-0" onclick="testBomb(0)">
+      <span class="bomb-emoji">🧨</span>
+      <div class="bomb-name">Firecracker</div>
+      <div class="bomb-stars">⭐</div>
+      <span class="tested-badge">✓ Tested</span>
+    </div>
+    <div class="bomb-card" id="bomb-1" onclick="testBomb(1)">
+      <span class="bomb-emoji">💣</span>
+      <div class="bomb-name">Dynamite</div>
+      <div class="bomb-stars">⭐⭐</div>
+      <span class="tested-badge">✓ Tested</span>
+    </div>
+    <div class="bomb-card" id="bomb-2" onclick="testBomb(2)">
+      <span class="bomb-emoji">🎆</span>
+      <div class="bomb-name">Super TNT</div>
+      <div class="bomb-stars">⭐⭐⭐</div>
+      <span class="tested-badge">✓ Tested</span>
+    </div>
+    <div class="bomb-card" id="bomb-3" onclick="testBomb(3)">
+      <span class="bomb-emoji">☢️</span>
+      <div class="bomb-name">MEGA BOMB</div>
+      <div class="bomb-stars">⭐⭐⭐⭐⭐</div>
+      <span class="tested-badge">✓ Tested</span>
+    </div>
+  </div>
+
+  <div class="ready-msg" id="ready-msg"></div>
+  <button class="btn btn-mission" id="mission-btn" style="display:none" onclick="startInfiltrate()">
+    🕵️ SNEAK INTO THE BASE!
+  </button>
+</div>
+
+<!-- ── Screen 2b: Infiltrate the base ── -->
+<div id="screen-infiltrate" class="screen">
+  <div class="infil-title">🕵️ SWAP THE BOMB &amp; ESCAPE!</div>
+  <div class="infil-sub">Reach ☢️ → swap it → run to EXIT! Shoot guards with 🔫</div>
+  <canvas id="base-canvas" width="416" height="352"></canvas>
+  <div class="controls-row">
+    <div class="dpad">
+      <div class="dpad-empty"></div>
+      <button class="dpad-btn" id="dpad-up">↑</button>
+      <div class="dpad-empty"></div>
+      <button class="dpad-btn" id="dpad-left">←</button>
+      <div class="dpad-empty"></div>
+      <button class="dpad-btn" id="dpad-right">→</button>
+      <div class="dpad-empty"></div>
+      <button class="dpad-btn" id="dpad-down">↓</button>
+      <div class="dpad-empty"></div>
+    </div>
+    <button class="fire-btn" id="fire-btn">🎯<br><small style="font-size:0.6rem;font-weight:900">SNIPE</small></button>
+  </div>
+</div>
+
+<!-- ── Screen 2c: Escape sequence ── -->
+<div id="screen-escape" class="screen">
+  <div class="esc-title">🚀 ESCAPING!</div>
+  <div class="esc-sub">Bomb armed — get out of there!</div>
+  <div class="jet-track">
+    <canvas id="escape-jet-canvas"></canvas>
+  </div>
+  <div class="esc-countdown" id="escape-cd">💣 DETONATING...</div>
+</div>
+
+<!-- ── Screen 3: Mission ── -->
+<div id="screen-mission" class="screen">
+  <div class="mission-title">🎯 FINAL MISSION</div>
+  <div class="mission-sub">Find the base on the map — then DROP IT!</div>
+
+  <canvas id="map-canvas" width="360" height="300" style="border-radius:16px; border:3px solid #ff6b6b; margin-bottom:16px; max-width:100%;"></canvas>
+
+  <button class="btn btn-mission" id="drop-btn" onclick="dropBomb()" style="font-size:1.1rem; padding:18px 30px;">
+    ☢️ DROP THE MEGA BOMB!
+  </button>
+</div>
+
+<!-- Falling bomb (fixed overlay) -->
+<div id="falling-bomb">☢️</div>
+
+<!-- Flash overlay -->
+<div id="flash-overlay"></div>
+<!-- Cheat banner -->
+<div id="cheat-banner"></div>
+
+<!-- ── Screen 4: Victory ── -->
+<div id="screen-victory" class="screen">
+  <div class="victory-trophy">🏆</div>
+  <div class="victory-title">MISSION COMPLETE!</div>
+  <div class="victory-sub">YOU DESTROYED THE BASE! 💥🔥💥</div>
+  <button class="btn btn-again" onclick="restart()">🔄 Play Again!</button>
+</div>
+
+<script>
+  const BOMBS = [
+    { power: 15, color: '#ff6b6b', name: 'Firecracker' },
+    { power: 35, color: '#ff9f43', name: 'Dynamite' },
+    { power: 65, color: '#ffd93d', name: 'Super TNT' },
+    { power: 100, color: '#ff6b6b', name: 'MEGA BOMB ☢️' }
+  ];
+
+  let tested = new Set();
+  let testing = false;
+
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function showTest() { show('screen-test'); }
+  function showMission() {
+    show('screen-mission');
+    setTimeout(() => drawMap(0, 0), 50); // draw after screen visible
+  }
+
+  function testBomb(idx) {
+    if (testing) return;
+    testing = true;
+
+    const card = document.getElementById('bomb-' + idx);
+    const bomb = BOMBS[idx];
+    const crate = document.getElementById('crate');
+
+    // Wiggle card
+    card.classList.add('testing');
+    setTimeout(() => card.classList.remove('testing'), 600);
+
+    // Explosion at crate position
+    const crateRect = crate.getBoundingClientRect();
+    spawnExplosion(crateRect.left + crateRect.width / 2, crateRect.top + crateRect.height / 2, bomb.color);
+
+    // Shake screen
+    document.body.style.animation = 'shake 0.35s ease';
+    setTimeout(() => { document.body.style.animation = ''; }, 400);
+
+    // Play sound
+    playBoom(bomb.power);
+
+    // Crate reacts
+    crate.style.transform = 'scale(1.6) rotate(15deg)';
+    setTimeout(() => { crate.style.transform = ''; }, 300);
+
+    // Power meter
+    const fill = document.getElementById('power-fill');
+    const label = document.getElementById('power-label');
+    fill.style.width = bomb.power + '%';
+    label.textContent = '💥 Power: ' + bomb.name + ' — ' + bomb.power + '%';
+
+    // Mark tested
+    setTimeout(() => {
+      card.classList.add('tested');
+      tested.add(idx);
+      testing = false;
+      checkAllTested();
+    }, 700);
+  }
+
+  function checkAllTested() {
+    const msg = document.getElementById('ready-msg');
+    const btn = document.getElementById('mission-btn');
+
+    if (tested.size === 1) {
+      msg.textContent = 'Nice! Try more bombs! 👀';
+    } else if (tested.size === 2) {
+      msg.textContent = '🤫 Psst... there\'s a NUCLEAR bomb hidden in the enemy base!';
+      btn.innerHTML = '🕵️ SNEAK INTO THE BASE!';
+      btn.style.display = 'block';
+    } else if (tested.size === 3) {
+      msg.textContent = '☢️ The Nuclear bomb is waiting inside the base...';
+    } else if (tested.size === 4) {
+      msg.textContent = '☢️ ALL tested! Now sneak in and grab the NUCLEAR BOMB!';
+    }
+  }
+
+  function spawnExplosion(x, y, color) {
+    const ring = document.createElement('div');
+    ring.className = 'explosion-ring';
+    ring.style.left = (x - 20) + 'px';
+    ring.style.top  = (y - 20) + 'px';
+    ring.style.background = color;
+    ring.style.animation = 'explode 0.6s ease-out forwards';
+    document.body.appendChild(ring);
+    setTimeout(() => ring.remove(), 700);
+
+    // Second smaller ring
+    const ring2 = document.createElement('div');
+    ring2.className = 'explosion-ring';
+    ring2.style.left = (x - 20) + 'px';
+    ring2.style.top  = (y - 20) + 'px';
+    ring2.style.background = '#fff';
+    ring2.style.opacity = '0.6';
+    ring2.style.animation = 'explode 0.4s ease-out 0.1s forwards';
+    document.body.appendChild(ring2);
+    setTimeout(() => ring2.remove(), 600);
+  }
+
+  // ── Map constants ──
+  const MAP_W = 360, MAP_H = 300;
+  const BASE_X = 255, BASE_Y = 100; // centre of military compound on map
+
+  // Trees: [x, y, radius]
+  const TREES = [
+    [30,40,8],[60,20,10],[20,90,9],[80,60,8],[50,130,9],
+    [30,170,10],[15,210,8],[55,200,9],[90,180,8],[40,250,9],
+    [100,240,8],[320,240,9],[330,200,8],[340,160,9],[310,160,8],
+    [130,270,9],[160,50,8],[180,30,10],[200,270,8],[230,270,9],
+  ];
+
+  function drawMap(explosionRadius, craterRadius) {
+    const canvas = document.getElementById('map-canvas');
+    const ctx = canvas.getContext('2d');
+    const W = MAP_W, H = MAP_H;
+
+    // ── Ground ──
+    ctx.fillStyle = '#4a7c3f';
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Roads ──
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 12;
+    ctx.lineCap = 'round';
+    // horizontal road
+    ctx.beginPath(); ctx.moveTo(0, 200); ctx.lineTo(W, 200); ctx.stroke();
+    // vertical road
+    ctx.beginPath(); ctx.moveTo(130, 0); ctx.lineTo(130, H); ctx.stroke();
+    // road markings
+    ctx.strokeStyle = '#bbb';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([18, 14]);
+    ctx.beginPath(); ctx.moveTo(0, 200); ctx.lineTo(W, 200); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(130, 0); ctx.lineTo(130, H); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ── River ──
+    ctx.strokeStyle = '#3a7bd5';
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    ctx.moveTo(0, 260);
+    ctx.bezierCurveTo(80, 250, 100, 280, 200, 270);
+    ctx.bezierCurveTo(260, 265, 300, 290, W, 280);
+    ctx.stroke();
+
+    // ── Trees (skip if inside crater) ──
+    TREES.forEach(([tx, ty, tr]) => {
+      const dx = tx - BASE_X, dy = ty - BASE_Y;
+      if (craterRadius && Math.sqrt(dx*dx + dy*dy) < craterRadius * 0.8) return;
+      ctx.fillStyle = '#2d6a24';
+      ctx.beginPath();
+      ctx.arc(tx, ty, tr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#3a8230';
+      ctx.beginPath();
+      ctx.arc(tx - 2, ty - 2, tr * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // ── Military base (skip if blown up) ──
+    if (!craterRadius || craterRadius < 55) {
+      // Fence/perimeter
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 2;
+      ctx.fillStyle = '#c8b86a';
+      ctx.fillRect(BASE_X - 55, BASE_Y - 45, 110, 90);
+      ctx.strokeRect(BASE_X - 55, BASE_Y - 45, 110, 90);
+
+      // Buildings
+      const buildings = [
+        [BASE_X - 40, BASE_Y - 32, 36, 26, '#8b6914'],
+        [BASE_X + 10, BASE_Y - 32, 30, 22, '#7a5c10'],
+        [BASE_X - 40, BASE_Y + 6,  28, 22, '#9b7820'],
+        [BASE_X + 8,  BASE_Y + 8,  34, 22, '#8b6914'],
+      ];
+      buildings.forEach(([bx, by, bw, bh, bc]) => {
+        ctx.fillStyle = bc;
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(bx, by, bw, 5); // roof shadow
+      });
+
+      // Heli pad
+      ctx.fillStyle = '#555';
+      ctx.beginPath();
+      ctx.arc(BASE_X + 35, BASE_Y + 25, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffd93d';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('H', BASE_X + 35, BASE_Y + 25);
+
+      // Target crosshair (blinking handled by CSS — just draw it)
+      ctx.strokeStyle = 'rgba(255,50,50,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(BASE_X, BASE_Y, 22, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(BASE_X - 30, BASE_Y); ctx.lineTo(BASE_X + 30, BASE_Y);
+      ctx.moveTo(BASE_X, BASE_Y - 30); ctx.lineTo(BASE_X, BASE_Y + 30);
+      ctx.stroke();
+    }
+
+    // ── Explosion ──
+    if (explosionRadius > 0) {
+      // Outer shockwave ring
+      const grad = ctx.createRadialGradient(BASE_X, BASE_Y, 0, BASE_X, BASE_Y, explosionRadius);
+      grad.addColorStop(0,   'rgba(255,255,200,0.95)');
+      grad.addColorStop(0.2, 'rgba(255,180,0,0.85)');
+      grad.addColorStop(0.5, 'rgba(255,80,0,0.6)');
+      grad.addColorStop(0.8, 'rgba(180,30,0,0.3)');
+      grad.addColorStop(1,   'rgba(80,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(BASE_X, BASE_Y, explosionRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Shockwave ring outline
+      ctx.strokeStyle = 'rgba(255,220,100,0.7)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(BASE_X, BASE_Y, explosionRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // ── Crater ──
+    if (craterRadius > 0) {
+      const cg = ctx.createRadialGradient(BASE_X, BASE_Y, 0, BASE_X, BASE_Y, craterRadius);
+      cg.addColorStop(0,   '#111');
+      cg.addColorStop(0.5, '#2a1a0a');
+      cg.addColorStop(0.8, '#3d2510');
+      cg.addColorStop(1,   'rgba(40,20,5,0)');
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.arc(BASE_X, BASE_Y, craterRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Smoke puffs
+      for (let i = 0; i < 5; i++) {
+        const angle = (i / 5) * Math.PI * 2;
+        const sx = BASE_X + Math.cos(angle) * craterRadius * 0.5;
+        const sy = BASE_Y + Math.sin(angle) * craterRadius * 0.5;
+        ctx.fillStyle = 'rgba(80,80,80,0.3)';
+        ctx.beginPath();
+        ctx.arc(sx, sy, craterRadius * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // ── Compass ──
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.arc(18, 18, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff4444';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('N', 18, 18);
+  }
+
+  function dropBomb() {
+    document.getElementById('drop-btn').disabled = true;
+    document.getElementById('drop-btn').style.opacity = '0.4';
+
+    // Get canvas position for overlay explosion spawns
+    const canvas = document.getElementById('map-canvas');
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / MAP_W;
+    const screenX = rect.left + BASE_X * scaleX;
+    const screenY = rect.top + BASE_Y * (rect.height / MAP_H);
+
+    // Animate falling bomb emoji
+    const fb = document.getElementById('falling-bomb');
+    fb.className = '';
+    fb.offsetWidth;
+    fb.classList.add('falling');
+
+    playBoom(100, true);
+
+    // Animate explosion on canvas
+    let startTime = null;
+    const DURATION = 1800;
+
+    function animateExplosion(ts) {
+      if (!startTime) startTime = ts;
+      const elapsed = ts - startTime;
+      const t = Math.min(elapsed / DURATION, 1);
+
+      // Explosion grows fast then slows
+      const expR = t < 0.4
+        ? (t / 0.4) * 90         // fast expand to 90px
+        : 90 + (t - 0.4) * 15;   // slow drift to 99px
+
+      // Crater grows after explosion peaks
+      const craterR = t > 0.35 ? ((t - 0.35) / 0.65) * 60 : 0;
+
+      drawMap(expR, craterR);
+
+      if (t < 1) {
+        requestAnimationFrame(animateExplosion);
+      } else {
+        // Screen flash + shake after impact
+        const flash = document.getElementById('flash-overlay');
+        flash.className = 'flashing';
+        setTimeout(() => { flash.className = ''; }, 700);
+        document.body.style.animation = 'shake 0.6s ease';
+        setTimeout(() => { document.body.style.animation = ''; }, 700);
+
+        // Overlay sparks
+        for (let i = 0; i < 5; i++) {
+          const colors = ['#ff6b6b','#ffd93d','#ff9f43','#fff','#f7971e'];
+          setTimeout(() => spawnExplosion(
+            screenX + (Math.random() - 0.5) * 80,
+            screenY + (Math.random() - 0.5) * 60,
+            colors[i]
+          ), i * 120);
+        }
+
+        fb.className = '';
+        setTimeout(() => { show('screen-victory'); launchConfetti(); }, 1600);
+      }
+    }
+
+    setTimeout(() => requestAnimationFrame(animateExplosion), 1150);
+  }
+
+  function launchConfetti() {
+    const colors = ['#ff6b6b','#ffd93d','#38ef7d','#6bceff','#ff9f43','#e056fd'];
+    for (let i = 0; i < 60; i++) {
+      setTimeout(() => {
+        const c = document.createElement('div');
+        c.className = 'confetti-piece';
+        c.style.left = Math.random() * 100 + 'vw';
+        c.style.top = '-20px';
+        c.style.background = colors[Math.floor(Math.random() * colors.length)];
+        c.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)';
+        c.style.animationDuration = (2 + Math.random() * 2) + 's';
+        c.style.animationDelay = '0s';
+        document.body.appendChild(c);
+        setTimeout(() => c.remove(), 4500);
+      }, i * 60);
+    }
+  }
+
+  // ── Infiltrate: tile map ──
+  const TILE = 32, COLS = 13, ROWS = 11;
+  const LEVEL = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,1,0,0,0,1,0,0,0,1],
+    [1,0,1,0,1,0,1,0,1,0,1,0,1],
+    [1,0,1,0,0,0,1,0,0,0,1,0,1],
+    [1,0,1,1,1,0,1,1,1,0,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,1,0,1],
+    [1,1,1,0,1,1,1,0,1,0,1,0,1],
+    [1,0,0,0,1,0,0,0,1,0,0,0,1],
+    [1,0,1,1,1,0,1,1,1,1,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,2,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ];
+  const DECOS = [[1,3,'📦'],[3,5,'🖥️'],[5,7,'📦'],[7,5,'🖥️'],[9,3,'🚨'],[1,10,'📦'],[7,10,'🖥️']];
+  const BOMB_X = 10*TILE+16, BOMB_Y = 9*TILE+16;
+  const EXIT_X  = 1*TILE+16,  EXIT_Y = 1*TILE+16;
+
+  let player, keysHeld, rafId, bombSwapped, gamePhase, playerHP;
+  let guards, pBullets, eBullets, lastFire, statusMsg, statusTimer;
+  let muzzleFlash = 0; // countdown frames for muzzle flash effect
+  let countdownStart = null;
+  const COUNTDOWN_SECS = 30;
+
+  function tileAt(px, py) {
+    const col = Math.floor(px/TILE), row = Math.floor(py/TILE);
+    if (row<0||row>=ROWS||col<0||col>=COLS) return 1;
+    return LEVEL[row][col];
+  }
+  function canMove(px, py, r=10) {
+    return tileAt(px-r,py-r)!==1 && tileAt(px+r,py-r)!==1 &&
+           tileAt(px-r,py+r)!==1 && tileAt(px+r,py+r)!==1;
+  }
+
+  function makeGuards() {
+    return [
+      { x:5*TILE+16, y:1*TILE+16, hp:2, angle:0,        st:'patrol', st2:120, path:[[5*TILE+16,1*TILE+16],[7*TILE+16,1*TILE+16]], pi:0 },
+      { x:2*TILE+16, y:7*TILE+16, hp:2, angle:Math.PI/2, st:'patrol', st2:80,  path:[[2*TILE+16,5*TILE+16],[2*TILE+16,7*TILE+16]], pi:0 },
+      { x:9*TILE+16, y:5*TILE+16, hp:2, angle:0,         st:'patrol', st2:60,  path:[[7*TILE+16,5*TILE+16],[9*TILE+16,5*TILE+16]], pi:0 },
+      { x:11*TILE+16,y:3*TILE+16, hp:2, angle:Math.PI,   st:'patrol', st2:100, path:[[11*TILE+16,1*TILE+16],[11*TILE+16,3*TILE+16]],pi:0 },
+    ];
+  }
+
+  function firePlayerBullet() {
+    if (Date.now()-lastFire < 850) return; // bolt-action: slow but deadly
+    lastFire = Date.now();
+    let nearest=null, nd=Infinity;
+    guards.forEach(g => { if(g.st==='dead') return; const d=Math.hypot(g.x-player.x,g.y-player.y); if(d<nd){nd=d;nearest=g;} });
+    const angle = nearest && nd < 620  // long sniper range
+      ? Math.atan2(nearest.y-player.y, nearest.x-player.x)
+      : (player.angle ?? 0);
+    player.angle = angle;
+    // Fast, piercing sniper round — spawns at barrel tip
+    const bx = player.x + Math.cos(angle) * 14;
+    const by = player.y + Math.sin(angle) * 14;
+    pBullets.push({ x:bx, y:by, dx:Math.cos(angle)*22, dy:Math.sin(angle)*22, pierce:true });
+    muzzleFlash = 7;
+    playSniper();
+  }
+
+  // ── Top-down sniper rifle drawn on the player ──
+  function drawSniperRifle(ctx, px, py, angle, mf) {
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(angle);
+
+    // Stock (wood, behind player)
+    const woodGrad = ctx.createLinearGradient(0,-2,0,2);
+    woodGrad.addColorStop(0,'#8b5a2b'); woodGrad.addColorStop(0.5,'#a0692f'); woodGrad.addColorStop(1,'#6b4220');
+    ctx.fillStyle = woodGrad;
+    ctx.beginPath(); ctx.roundRect(-27,-2,18,4,1); ctx.fill();
+    // Cheek rest bump on stock
+    ctx.fillStyle = '#7a4e22';
+    ctx.beginPath(); ctx.ellipse(-20,-3.5,5,1.5,0,0,Math.PI*2); ctx.fill();
+    // Butt plate
+    ctx.fillStyle = '#2a1a0a';
+    ctx.fillRect(-28,-3,3,6);
+
+    // Receiver body (dark steel)
+    const recGrad = ctx.createLinearGradient(0,-3,0,3);
+    recGrad.addColorStop(0,'#555'); recGrad.addColorStop(0.4,'#777'); recGrad.addColorStop(1,'#333');
+    ctx.fillStyle = recGrad;
+    ctx.beginPath(); ctx.roundRect(-9,-3,14,6,1); ctx.fill();
+
+    // Scope rail
+    ctx.fillStyle = '#444';
+    ctx.fillRect(-6,-5,12,2);
+
+    // Long scope body
+    const sGrad = ctx.createLinearGradient(0,-7,0,-3.5);
+    sGrad.addColorStop(0,'#282828'); sGrad.addColorStop(0.5,'#4a4a4a'); sGrad.addColorStop(1,'#1a1a1a');
+    ctx.fillStyle = sGrad;
+    ctx.beginPath(); ctx.roundRect(-7,-8.5,17,4.5,1.5); ctx.fill();
+    // Scope front bell (wider)
+    ctx.fillStyle = '#333';
+    ctx.beginPath(); ctx.ellipse(10,-6.25,3,2.8,0,0,Math.PI*2); ctx.fill();
+    // Scope rear bell
+    ctx.beginPath(); ctx.ellipse(-7,-6.25,2.2,2.2,0,0,Math.PI*2); ctx.fill();
+    // Front lens glint
+    ctx.fillStyle = 'rgba(80,160,255,0.85)';
+    ctx.beginPath(); ctx.arc(10,-6.25,2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(200,230,255,0.5)';
+    ctx.beginPath(); ctx.arc(9,-7,0.7,0,Math.PI*2); ctx.fill();
+    // Elevation turret knob
+    ctx.fillStyle = '#3a3a3a';
+    ctx.beginPath(); ctx.roundRect(1,-11,4,3,0.8); ctx.fill();
+    ctx.fillStyle = '#555';
+    ctx.beginPath(); ctx.roundRect(1.5,-10.5,3,2,0.5); ctx.fill();
+
+    // Barrel (long, slender, dark steel)
+    const bGrad = ctx.createLinearGradient(0,-1.5,0,1.5);
+    bGrad.addColorStop(0,'#888'); bGrad.addColorStop(0.4,'#bbb'); bGrad.addColorStop(1,'#555');
+    ctx.fillStyle = bGrad;
+    ctx.fillRect(5,-1.5,33,3);
+    // Barrel fluting lines (aesthetic)
+    ctx.strokeStyle = 'rgba(60,60,60,0.6)'; ctx.lineWidth = 0.5;
+    for (let fi=0; fi<3; fi++) {
+      ctx.beginPath(); ctx.moveTo(8+fi*8,-1.5); ctx.lineTo(8+fi*8,1.5); ctx.stroke();
+    }
+
+    // Suppressor / muzzle brake at tip
+    const sGrad2 = ctx.createLinearGradient(0,-2.5,0,2.5);
+    sGrad2.addColorStop(0,'#555'); sGrad2.addColorStop(0.5,'#888'); sGrad2.addColorStop(1,'#444');
+    ctx.fillStyle = sGrad2;
+    ctx.beginPath(); ctx.roundRect(35,-2.8,7,5.6,1); ctx.fill();
+    ctx.strokeStyle='rgba(200,200,200,0.25)'; ctx.lineWidth=0.8;
+    ctx.beginPath(); ctx.moveTo(36.5,-2.8); ctx.lineTo(36.5,2.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(39,-2.8); ctx.lineTo(39,2.8); ctx.stroke();
+
+    // Bipod legs (fold down from front of barrel)
+    ctx.strokeStyle='#666'; ctx.lineWidth=1.5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(30,1.5); ctx.lineTo(28,10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(34,1.5); ctx.lineTo(36,10); ctx.stroke();
+    ctx.strokeStyle='#555'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(27,10); ctx.lineTo(29,10); ctx.stroke(); // foot
+    ctx.beginPath(); ctx.moveTo(35,10); ctx.lineTo(37,10); ctx.stroke();
+
+    // Muzzle flash
+    if (mf > 0) {
+      const fa = mf / 7;
+      // Core bright flash
+      const fg = ctx.createRadialGradient(42,0,0, 42,0, 10*fa);
+      fg.addColorStop(0,  `rgba(255,255,220,${fa})`);
+      fg.addColorStop(0.4,`rgba(255,200,50,${fa*0.8})`);
+      fg.addColorStop(1,  `rgba(255,80,0,0)`);
+      ctx.fillStyle = fg;
+      ctx.beginPath(); ctx.arc(42,0,12*fa,0,Math.PI*2); ctx.fill();
+      // Spiky rays
+      ctx.strokeStyle=`rgba(255,220,80,${fa*0.9})`; ctx.lineWidth=1.5;
+      for (let ri=0; ri<6; ri++) {
+        const ra = (ri/6)*Math.PI*2;
+        ctx.beginPath(); ctx.moveTo(42,0); ctx.lineTo(42+Math.cos(ra)*9*fa, Math.sin(ra)*9*fa); ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function drawBase() {
+    const canvas = document.getElementById('base-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const glow = 0.55 + 0.45*Math.sin(Date.now()/350);
+
+    // Tiles
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+      const x=c*TILE, y=r*TILE, t=LEVEL[r][c];
+      if (t===1) {
+        ctx.fillStyle='#252525'; ctx.fillRect(x,y,TILE,TILE);
+        ctx.fillStyle='#3a3a3a'; ctx.fillRect(x,y,TILE,3); ctx.fillRect(x,y,3,TILE);
+      } else {
+        ctx.fillStyle='#9c8a6e'; ctx.fillRect(x,y,TILE,TILE);
+        ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=0.5; ctx.strokeRect(x,y,TILE,TILE);
+      }
+      if (t===2) {
+        ctx.save();
+        if (!bombSwapped) { ctx.shadowColor=`rgba(0,255,120,${glow})`; ctx.shadowBlur=8+glow*18; }
+        ctx.font='22px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(bombSwapped?'💣':'☢️', x+TILE/2, y+TILE/2);
+        ctx.restore();
+      }
+    }
+
+    // Exit marker
+    if (gamePhase==='escape') {
+      ctx.fillStyle='rgba(56,239,125,0.25)'; ctx.beginPath(); ctx.arc(EXIT_X,EXIT_Y,22,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#38ef7d'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(EXIT_X,EXIT_Y,22,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='#38ef7d'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('EXIT',EXIT_X,EXIT_Y);
+    }
+
+    // Decorations
+    ctx.font='18px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    DECOS.forEach(([r,c,e]) => ctx.fillText(e, c*TILE+TILE/2, r*TILE+TILE/2));
+
+    // Enemy bullets
+    eBullets.forEach(b => {
+      ctx.fillStyle='#ff4444'; ctx.beginPath(); ctx.arc(b.x,b.y,4,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,80,80,0.35)'; ctx.beginPath(); ctx.arc(b.x,b.y,8,0,Math.PI*2); ctx.fill();
+    });
+    // Player bullets — sniper tracer rounds
+    pBullets.forEach(b => {
+      ctx.save();
+      // Long smoke/heat trail behind bullet
+      const tLen = Math.hypot(b.dx,b.dy) * 2.8;
+      const tGrad = ctx.createLinearGradient(b.x, b.y, b.x-b.dx*2.8, b.y-b.dy*2.8);
+      tGrad.addColorStop(0,  'rgba(255,240,180,0.7)');
+      tGrad.addColorStop(0.4,'rgba(200,200,200,0.35)');
+      tGrad.addColorStop(1,  'rgba(150,150,150,0)');
+      ctx.strokeStyle = tGrad; ctx.lineWidth = 3.5; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x-b.dx*2.8, b.y-b.dy*2.8); ctx.stroke();
+      // Bullet core (elongated, bright)
+      ctx.strokeStyle='rgba(255,255,220,0.95)'; ctx.lineWidth=2; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(b.x-b.dx*0.4,b.y-b.dy*0.4); ctx.lineTo(b.x+b.dx*0.3,b.y+b.dy*0.3); ctx.stroke();
+      // Bright tip
+      ctx.fillStyle='rgba(255,255,255,1)';
+      ctx.beginPath(); ctx.arc(b.x,b.y,2.2,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    });
+
+    // Guards
+    guards.forEach(g => {
+      if (g.st==='dead') { ctx.font='20px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('💀',g.x,g.y); return; }
+      ctx.fillStyle=g.st==='chase'?'#c0392b':'#e74c3c';
+      ctx.beginPath(); ctx.arc(g.x,g.y,13,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(g.x,g.y,13,0,Math.PI*2); ctx.stroke();
+      ctx.font='16px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('👮',g.x,g.y-1);
+      ctx.strokeStyle='#aaa'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(g.x,g.y); ctx.lineTo(g.x+Math.cos(g.angle)*18,g.y+Math.sin(g.angle)*18); ctx.stroke();
+      for (let i=0;i<2;i++) { ctx.fillStyle=i<g.hp?'#e74c3c':'#444'; ctx.fillRect(g.x-9+i*11,g.y-22,9,4); }
+    });
+
+    // Scope laser line to nearest enemy in sniper range
+    if (player.angle != null) {
+      let sNear=null, sNd=Infinity;
+      guards.forEach(g => { if(g.st==='dead') return; const d=Math.hypot(g.x-player.x,g.y-player.y); if(d<sNd){sNd=d;sNear=g;} });
+      if (sNear && sNd < 620) {
+        const blink = Math.sin(Date.now()/90) > 0;
+        ctx.save();
+        ctx.setLineDash([5,7]);
+        ctx.strokeStyle = `rgba(255,30,30,${0.3 + 0.25*Math.sin(Date.now()/100)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(player.x + Math.cos(player.angle)*14, player.y + Math.sin(player.angle)*14);
+        ctx.lineTo(sNear.x, sNear.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Red dot on target
+        ctx.fillStyle = blink ? 'rgba(255,0,0,0.9)' : 'rgba(255,80,80,0.7)';
+        ctx.beginPath(); ctx.arc(sNear.x, sNear.y, 5, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // Player body
+    ctx.fillStyle=playerHP>1?'#2ecc71':'#e74c3c';
+    ctx.beginPath(); ctx.arc(player.x,player.y,11,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(player.x,player.y,11,0,Math.PI*2); ctx.stroke();
+    ctx.font='15px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🕵️',player.x,player.y-1);
+    // Sniper rifle on top of player
+    if (player.angle != null) {
+      drawSniperRifle(ctx, player.x, player.y, player.angle, muzzleFlash);
+      if (muzzleFlash > 0) muzzleFlash--;
+    }
+
+    // HUD: hearts (gold stars in god mode)
+    ctx.font='16px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='top';
+    for (let i=0;i<3;i++) ctx.fillText(godMode?'⭐':(i<playerHP?'❤️':'🖤'), 4+i*22, 4);
+
+    // HUD: countdown
+    if (bombSwapped && countdownStart !== null) {
+      const rem = Math.max(0, COUNTDOWN_SECS - (Date.now()-countdownStart)/1000);
+      const secs = Math.ceil(rem);
+      const urgent = secs <= 10;
+      const blink = urgent && Math.floor(Date.now()/220) % 2 === 0;
+      ctx.save();
+      ctx.fillStyle = blink ? 'rgba(255,0,0,0.9)' : 'rgba(0,0,0,0.7)';
+      ctx.fillRect(COLS*TILE/2-62, 2, 124, 28);
+      ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = urgent ? (blink ? '#fff' : '#ff4444') : '#ffd93d';
+      ctx.fillText(`💣 ${secs}s — RUN!`, COLS*TILE/2, 16);
+      ctx.restore();
+    }
+
+    // Status message
+    if (statusTimer>0) {
+      statusTimer--;
+      ctx.save();
+      ctx.font='bold 15px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle=`rgba(255,220,50,${Math.min(statusTimer/15,1)})`;
+      ctx.fillText(statusMsg, COLS*TILE/2, ROWS*TILE/2);
+      ctx.restore();
+    }
+  }
+
+  function updateGuards() {
+    const sight = gamePhase==='escape' ? 500 : 140;
+    guards.forEach(g => {
+      if (g.st==='dead') return;
+      const d = Math.hypot(player.x-g.x, player.y-g.y);
+      if (d < sight || gamePhase==='escape') g.st = 'chase';
+      if (g.st==='chase') {
+        g.angle = Math.atan2(player.y-g.y, player.x-g.x);
+        const sp = 1.5;
+        if (canMove(g.x+Math.cos(g.angle)*sp, g.y, 11)) g.x += Math.cos(g.angle)*sp;
+        if (canMove(g.x, g.y+Math.sin(g.angle)*sp, 11)) g.y += Math.sin(g.angle)*sp;
+        g.st2--;
+        if (g.st2<=0 && d<210) {
+          g.st2 = 80+Math.random()*60;
+          const spread=(Math.random()-0.5)*0.3;
+          eBullets.push({ x:g.x,y:g.y, dx:Math.cos(g.angle+spread)*4.5, dy:Math.sin(g.angle+spread)*4.5 });
+        }
+      } else {
+        const [tx,ty]=g.path[g.pi], ddx=tx-g.x, ddy=ty-g.y, dd=Math.hypot(ddx,ddy);
+        if (dd<2) { g.pi=(g.pi+1)%g.path.length; }
+        else { g.angle=Math.atan2(ddy,ddx); if(canMove(g.x+ddx/dd*0.9,g.y,11))g.x+=ddx/dd*0.9; if(canMove(g.x,g.y+ddy/dd*0.9,11))g.y+=ddy/dd*0.9; }
+      }
+    });
+  }
+
+  function updateBullets() {
+    pBullets = pBullets.filter(b => {
+      b.x+=b.dx; b.y+=b.dy;
+      if (tileAt(b.x,b.y)===1 || b.x<0||b.y<0||b.x>COLS*TILE||b.y>ROWS*TILE) return false;
+      let hit=false;
+      guards.forEach(g => {
+        if(g.st==='dead') return;
+        if(Math.hypot(g.x-b.x,g.y-b.y)<14) {
+          g.hp -= 2; // sniper: one-shot kill
+          if(g.hp<=0) g.st='dead';
+          hit=true;
+        }
+      });
+      return b.pierce ? true : !hit; // piercing rounds continue through guards
+    });
+    eBullets = eBullets.filter(b => {
+      b.x+=b.dx; b.y+=b.dy;
+      if (tileAt(b.x,b.y)===1 || b.x<0||b.y<0||b.x>COLS*TILE||b.y>ROWS*TILE) return false;
+      if (Math.hypot(player.x-b.x,player.y-b.y)<12) {
+        if (!godMode) {
+          playerHP=Math.max(0,playerHP-1);
+          document.body.style.animation='shake 0.2s ease'; setTimeout(()=>{document.body.style.animation='';},250);
+          if (playerHP===0) { setTimeout(onGameOver,100); }
+        }
+        return false;
+      }
+      return true;
+    });
+  }
+
+  function onGameOver() {
+    cancelAnimationFrame(rafId); rafId=null;
+    statusMsg='💀 YOU WERE CAUGHT! Restarting...'; statusTimer=200;
+    setTimeout(() => {
+      player={x:EXIT_X,y:EXIT_Y,angle:0}; playerHP=3;
+      guards=makeGuards(); pBullets=[]; eBullets=[];
+      bombSwapped=false; gamePhase='sneak'; statusMsg=''; statusTimer=0;
+      rafId=requestAnimationFrame(gameLoop);
+    }, 2200);
+  }
+
+  function gameLoop() {
+    const speed=2; let dx=0,dy=0;
+    if(keysHeld['ArrowLeft'] ||keysHeld['a']) dx=-speed;
+    if(keysHeld['ArrowRight']||keysHeld['d']) dx=+speed;
+    if(keysHeld['ArrowUp']   ||keysHeld['w']) dy=-speed;
+    if(keysHeld['ArrowDown'] ||keysHeld['s']) dy=+speed;
+    if(dx&&dy){dx*=0.707;dy*=0.707;}
+    if(dx||dy) player.angle=Math.atan2(dy,dx);
+    if(dx&&canMove(player.x+dx,player.y)) player.x+=dx;
+    if(dy&&canMove(player.x,player.y+dy)) player.y+=dy;
+
+    if (playerHP>0) { updateGuards(); updateBullets(); }
+
+    // Bomb swap
+    if (!bombSwapped && Math.hypot(player.x-BOMB_X,player.y-BOMB_Y)<22) {
+      bombSwapped=true; gamePhase='escape'; countdownStart=Date.now();
+      statusMsg='💣 BOMB SWAPPED! RUN TO EXIT! ↖️'; statusTimer=160;
+    }
+    // Countdown expired → caught in explosion
+    if (bombSwapped && countdownStart !== null) {
+      const rem = COUNTDOWN_SECS - (Date.now()-countdownStart)/1000;
+      if (rem <= 0) { countdownStart=null; onTimeUp(); return; }
+    }
+    // Player reached exit with bomb
+    if (gamePhase==='escape' && Math.hypot(player.x-EXIT_X,player.y-EXIT_Y)<24) {
+      triggerEscape();
+      return;
+    }
+
+    drawBase();
+    rafId=requestAnimationFrame(gameLoop);
+  }
+
+  // ── Fighter jet drawing helper (faces right; cx,cy = center; sc = scale factor) ──
+  function drawJetShape(ctx, cx, cy, sc, angle) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (angle) ctx.rotate(angle);
+
+    // Twin afterburner flames (flickery)
+    const fl = (10 + Math.random() * 7) * sc;
+    for (const ey of [-3, 3]) {
+      const fg = ctx.createLinearGradient(-20*sc, ey*sc, (-20-fl)*sc, ey*sc);
+      fg.addColorStop(0,   'rgba(255,180,30,1)');
+      fg.addColorStop(0.35,'rgba(255,90,0,0.8)');
+      fg.addColorStop(1,   'rgba(255,40,0,0)');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.ellipse((-20 - fl*0.5)*sc, ey*sc, fl*0.55*sc, 2.2*sc, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // Main swept delta wings
+    ctx.fillStyle = '#4a5568';
+    ctx.beginPath(); ctx.moveTo(5*sc,-2*sc); ctx.lineTo(-6*sc,-22*sc); ctx.lineTo(-15*sc,-17*sc); ctx.lineTo(-11*sc,-2*sc); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(5*sc, 2*sc); ctx.lineTo(-6*sc, 22*sc); ctx.lineTo(-15*sc, 17*sc); ctx.lineTo(-11*sc, 2*sc); ctx.closePath(); ctx.fill();
+
+    // Horizontal tail stabilisers
+    ctx.fillStyle = '#3d4a5c';
+    ctx.beginPath(); ctx.moveTo(-14*sc,-1.5*sc); ctx.lineTo(-18*sc,-10*sc); ctx.lineTo(-23*sc,-7.5*sc); ctx.lineTo(-18*sc,-1.5*sc); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-14*sc, 1.5*sc); ctx.lineTo(-18*sc, 10*sc); ctx.lineTo(-23*sc,  7.5*sc); ctx.lineTo(-18*sc, 1.5*sc); ctx.closePath(); ctx.fill();
+
+    // Vertical tail fin
+    ctx.beginPath(); ctx.moveTo(-11*sc,-2*sc); ctx.lineTo(-15*sc,-13*sc); ctx.lineTo(-22*sc,-9*sc); ctx.lineTo(-16*sc,-2*sc); ctx.closePath(); ctx.fill();
+
+    // Twin engine nacelles (visible below wings)
+    ctx.fillStyle = '#2d3748';
+    ctx.beginPath(); ctx.ellipse(-7*sc,-8*sc,  7*sc,2*sc, 0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-7*sc, 8*sc,  7*sc,2*sc, 0,0,Math.PI*2); ctx.fill();
+
+    // Fuselage
+    const fbg = ctx.createLinearGradient(0,-5*sc,0,5*sc);
+    fbg.addColorStop(0,  '#8fa8c8'); fbg.addColorStop(0.3,'#b0c8e8');
+    fbg.addColorStop(0.7,'#7a95b0'); fbg.addColorStop(1,  '#4a6070');
+    ctx.fillStyle = fbg;
+    ctx.beginPath(); ctx.ellipse(-1*sc,0,20*sc,4.5*sc,0,0,Math.PI*2); ctx.fill();
+    // Fuselage panel lines
+    ctx.strokeStyle = 'rgba(100,140,180,0.4)'; ctx.lineWidth = 0.6;
+    ctx.beginPath(); ctx.moveTo(14*sc,-1*sc); ctx.lineTo(-18*sc,-1.5*sc); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(14*sc, 1*sc); ctx.lineTo(-18*sc,  1.5*sc); ctx.stroke();
+
+    // Nose cone
+    const nbg = ctx.createLinearGradient(18*sc,-3*sc,8*sc,3*sc);
+    nbg.addColorStop(0,'#c8d8e8'); nbg.addColorStop(1,'#8a9eb5');
+    ctx.fillStyle = nbg;
+    ctx.beginPath();
+    ctx.moveTo(19*sc,0);
+    ctx.bezierCurveTo(14*sc,-1.5*sc,9*sc,-3*sc,8*sc,-3*sc);
+    ctx.lineTo(8*sc,3*sc);
+    ctx.bezierCurveTo(9*sc,3*sc,14*sc,1.5*sc,19*sc,0);
+    ctx.closePath(); ctx.fill();
+
+    // Cockpit canopy
+    const cbg = ctx.createRadialGradient(9*sc,-3*sc,0,9*sc,-1.5*sc,6*sc);
+    cbg.addColorStop(0,'rgba(190,230,255,0.95)');
+    cbg.addColorStop(0.6,'rgba(60,130,210,0.7)');
+    cbg.addColorStop(1,'rgba(20,60,120,0.5)');
+    ctx.fillStyle = cbg;
+    ctx.beginPath(); ctx.ellipse(9*sc,-2*sc,6*sc,3*sc,-0.2,0,Math.PI*2); ctx.fill();
+    // Canopy frame
+    ctx.strokeStyle='rgba(200,240,255,0.5)'; ctx.lineWidth=0.8;
+    ctx.stroke();
+    // Canopy glint
+    ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=0.7;
+    ctx.beginPath(); ctx.moveTo(7*sc,-4*sc); ctx.lineTo(13*sc,-3.5*sc); ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // ── Canvas-based escape-screen jet animation ──
+  function startEscapeJetAnim() {
+    const el = document.getElementById('escape-jet-canvas');
+    const trackRect = el.parentElement.getBoundingClientRect();
+    const W = Math.round(trackRect.width)  || 420;
+    const H = Math.round(trackRect.height) || 90;
+    el.width = W; el.height = H;
+    const ctx = el.getContext('2d');
+    const cy = H / 2;
+    const sc = H / 58;      // scale so wingspan ≈ 75% of track height
+    const trail = [];       // {x, y, age}
+    let t0 = null;
+    const DUR = 2200;
+
+    // Pre-compute stars so they don't flicker
+    const stars = Array.from({length: 28}, (_,i) => ({
+      x: ((i*1373+491)*7919) % W,
+      y: ((i*311 +173)*3571) % H,
+      r: 0.5 + (i%4)*0.25,
+      a: 0.25 + (i%5)*0.12
+    }));
+
+    function frame(ts) {
+      if (!t0) t0 = ts;
+      const p   = Math.min((ts - t0) / DUR, 1);
+      const ease = 1 - Math.pow(1-p, 2);           // ease-out
+      const jetX = -85 + ease * (W + 170);
+
+      // Age & cull trail
+      for (let i = trail.length-1; i >= 0; i--) {
+        trail[i].age++;
+        if (trail[i].age > 75) trail.splice(i,1);
+      }
+      // Add new exhaust puffs at engine nozzle positions
+      if (jetX > -50 && jetX < W + 50) {
+        trail.push({x: jetX - 20*sc, y: cy - 3*sc, age:0});
+        trail.push({x: jetX - 20*sc, y: cy + 3*sc, age:0});
+      }
+
+      // ── Background ──
+      const sky = ctx.createLinearGradient(0,0,0,H);
+      sky.addColorStop(0,'#07101f'); sky.addColorStop(1,'#0d1a30');
+      ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
+
+      // Stars
+      stars.forEach(s => {
+        ctx.fillStyle = `rgba(255,255,255,${s.a})`;
+        ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+      });
+
+      // ── Contrails ──
+      trail.forEach(pt => {
+        const a = Math.max(0, 0.65 - pt.age/75);
+        const r = Math.min(3.5*sc, pt.age * 0.12 * sc);
+        ctx.fillStyle = `rgba(210,228,255,${a})`;
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, Math.max(0.5,r), 0, Math.PI*2); ctx.fill();
+      });
+
+      // ── Jet ──
+      if (jetX > -85 && jetX < W + 85) drawJetShape(ctx, jetX, cy, sc, 0);
+
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function triggerEscape() {
+    cancelAnimationFrame(rafId); rafId=null;
+    const rem = countdownStart ? Math.max(0, COUNTDOWN_SECS-(Date.now()-countdownStart)/1000) : 5;
+    show('screen-escape');
+    // Countdown display on escape screen
+    document.getElementById('escape-cd').textContent = `💣 DETONATING IN ${Math.ceil(rem)}s`;
+    // Canvas jet animation
+    setTimeout(startEscapeJetAnim, 30); // brief delay so screen is visible and sized
+    playJetSound();
+    // Count down on screen
+    let tick = Math.ceil(rem);
+    const cdEl = document.getElementById('escape-cd');
+    const cdTimer = setInterval(() => {
+      tick--;
+      cdEl.textContent = tick > 0 ? `💣 DETONATING IN ${tick}s` : '💥 BOOM!!!';
+      if (tick <= 0) clearInterval(cdTimer);
+    }, 1000);
+    // Transition to map after jet flies
+    setTimeout(() => {
+      show('screen-mission');
+      document.getElementById('drop-btn').style.display='none';
+      setTimeout(()=>{ drawMap(0,0); setTimeout(nuclearDrop,600); },80);
+    }, 2400);
+  }
+
+  function onTimeUp() {
+    cancelAnimationFrame(rafId); rafId=null;
+    // Flash the base canvas red
+    const bc = document.getElementById('base-canvas');
+    if (bc) {
+      const bctx = bc.getContext('2d');
+      bctx.fillStyle='rgba(255,80,0,0.85)'; bctx.fillRect(0,0,bc.width,bc.height);
+      bctx.font='bold 32px sans-serif'; bctx.textAlign='center'; bctx.textBaseline='middle';
+      bctx.fillStyle='#fff'; bctx.fillText('💥 KABOOM! TOO SLOW! 💥', bc.width/2, bc.height/2);
+    }
+    document.body.style.animation='shake 0.8s ease'; setTimeout(()=>{document.body.style.animation='';},900);
+    playBoom(100, true);
+    setTimeout(()=>{
+      player={x:EXIT_X,y:EXIT_Y,angle:0}; playerHP=3;
+      guards=makeGuards(); pBullets=[]; eBullets=[];
+      bombSwapped=false; gamePhase='sneak'; countdownStart=null;
+      statusMsg='💣 TRY AGAIN! Swap & escape in 30s!'; statusTimer=200;
+      rafId=requestAnimationFrame(gameLoop);
+    }, 2600);
+  }
+
+  function playSniper() {
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      // Sharp supersonic crack (noise burst with fast attack)
+      const len = ac.sampleRate * 0.18;
+      const buf = ac.createBuffer(1, len, ac.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        const t = i / ac.sampleRate;
+        // Instant attack, exponential decay — classic rifle crack
+        const env = t < 0.001 ? t / 0.001 : Math.exp(-(t - 0.001) * 38);
+        data[i] = (Math.random() * 2 - 1) * env;
+      }
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      const noiseGain = ac.createGain(); noiseGain.gain.setValueAtTime(0.8, ac.currentTime);
+      src.connect(noiseGain); noiseGain.connect(ac.destination);
+      src.start(); src.stop(ac.currentTime + 0.18);
+
+      // Low-end thump (the body shot impact feel)
+      const osc = ac.createOscillator(); const oscG = ac.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(160, ac.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(35, ac.currentTime + 0.1);
+      oscG.gain.setValueAtTime(0.5, ac.currentTime);
+      oscG.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.14);
+      osc.connect(oscG); oscG.connect(ac.destination);
+      osc.start(); osc.stop(ac.currentTime + 0.15);
+    } catch(e) {}
+  }
+
+  function playJetSound() {
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ac.createOscillator(); const gain = ac.createGain();
+      osc.type='sawtooth';
+      osc.frequency.setValueAtTime(80, ac.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(800, ac.currentTime+0.6);
+      osc.frequency.exponentialRampToValueAtTime(400, ac.currentTime+1.8);
+      gain.gain.setValueAtTime(0.25, ac.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+2.2);
+      osc.connect(gain); gain.connect(ac.destination);
+      osc.start(); osc.stop(ac.currentTime+2.3);
+    } catch(e) {}
+  }
+
+  function startInfiltrate() {
+    player={x:EXIT_X,y:EXIT_Y,angle:0}; keysHeld={}; lastFire=0;
+    bombSwapped=false; gamePhase='sneak'; playerHP=3; countdownStart=null;
+    guards=makeGuards(); pBullets=[]; eBullets=[];
+    statusMsg=''; statusTimer=0;
+    show('screen-infiltrate');
+    setTimeout(()=>{drawBase();rafId=requestAnimationFrame(gameLoop);},60);
+  }
+
+  // ── Cheat codes ──
+  let godMode = false;
+  const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+  const NUKE_SEQ = 'nuke';
+  let cheatBuf = [];
+  let cheatBannerTimer = null;
+
+  function showCheatBanner(msg) {
+    const el = document.getElementById('cheat-banner');
+    el.textContent = msg; el.style.display = 'block';
+    if (cheatBannerTimer) clearTimeout(cheatBannerTimer);
+    cheatBannerTimer = setTimeout(() => { el.style.display = 'none'; }, 2800);
+  }
+
+  function activateNukeCheat() {
+    showCheatBanner('💥 CHEAT: NUKE SKIP! 💥');
+    // Skip straight to nuclear mission
+    cancelAnimationFrame(rafId); rafId = null;
+    show('screen-mission');
+    document.getElementById('drop-btn').style.display = 'none';
+    setTimeout(() => { drawMap(0,0); setTimeout(nuclearDrop, 600); }, 80);
+  }
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','d','w','s'].includes(e.key)) {
+      e.preventDefault(); keysHeld[e.key]=true;
+    }
+    if (e.key===' ') { e.preventDefault(); if(document.getElementById('screen-infiltrate').classList.contains('active')) firePlayerBullet(); }
+
+    // Cheat buffer
+    cheatBuf.push(e.key); if (cheatBuf.length > 12) cheatBuf.shift();
+    // Konami → god mode toggle
+    if (cheatBuf.slice(-KONAMI.length).join('|') === KONAMI.join('|')) {
+      godMode = !godMode; cheatBuf = [];
+      showCheatBanner(godMode ? '🌟 GOD MODE ON! You are invincible!' : '😅 GOD MODE OFF');
+    }
+    // Type "nuke" → skip to nuclear drop
+    const typed = cheatBuf.map(k => k.length===1 ? k.toLowerCase() : '').join('');
+    if (typed.endsWith(NUKE_SEQ)) { cheatBuf = []; activateNukeCheat(); }
+  });
+  document.addEventListener('keyup', e => { delete keysHeld[e.key]; });
+
+  // D-pad + fire button
+  ['up','down','left','right'].forEach(dir => {
+    const key={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}[dir];
+    const btn=document.getElementById('dpad-'+dir); if(!btn) return;
+    ['touchstart','mousedown'].forEach(ev=>btn.addEventListener(ev,e=>{e.preventDefault();btn.classList.add('pressed');keysHeld[key]=true;},{passive:false}));
+    ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=>btn.addEventListener(ev,e=>{e.preventDefault();btn.classList.remove('pressed');delete keysHeld[key];}));
+  });
+  const fireBtn=document.getElementById('fire-btn');
+  if (fireBtn) {
+    ['touchstart','mousedown'].forEach(ev=>fireBtn.addEventListener(ev,e=>{e.preventDefault();firePlayerBullet();},{passive:false}));
+  }
+
+  // ── Nuclear explosion on map ──
+  function nuclearDrop() {
+    playBoom(100, true);
+    const canvas = document.getElementById('map-canvas');
+    const rect = canvas.getBoundingClientRect();
+    const sx = rect.left + BASE_X * (rect.width / MAP_W);
+    const sy = rect.top  + BASE_Y * (rect.height / MAP_H);
+    let t0 = null;
+    const DUR = 2800;
+    function frame(ts) {
+      if (!t0) t0 = ts;
+      const t = Math.min((ts - t0) / DUR, 1);
+      const expR  = t < 0.25 ? (t / 0.25) * 230 : 230;
+      const crtR  = t > 0.2  ? ((t - 0.2) / 0.8) * 140 : 0;
+      drawMapNuclear(expR, crtR, t);
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        document.getElementById('flash-overlay').className = 'flashing';
+        setTimeout(() => { document.getElementById('flash-overlay').className = ''; }, 700);
+        document.body.style.animation = 'shake 0.7s ease';
+        setTimeout(() => { document.body.style.animation = ''; }, 800);
+        const cols = ['#ff6b6b','#ffd93d','#ff9f43','#fff','#f7971e','#e056fd'];
+        for (let i = 0; i < 10; i++)
+          setTimeout(() => spawnExplosion(sx + (Math.random()-.5)*140, sy + (Math.random()-.5)*100, cols[i%6]), i*90);
+        setTimeout(() => { show('screen-victory'); launchConfetti(); }, 2000);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function drawMapNuclear(expR, crtR, t) {
+    const canvas = document.getElementById('map-canvas');
+    const ctx = canvas.getContext('2d');
+    const W = MAP_W, H = MAP_H;
+    const scorch = Math.min(t * 1.8, 1);
+
+    // Scorched ground
+    ctx.fillStyle = `rgb(${Math.floor(74*(1-scorch)+20*scorch)},${Math.floor(124*(1-scorch)+10*scorch)},${Math.floor(63*(1-scorch)+5*scorch)})`;
+    ctx.fillRect(0, 0, W, H);
+    if (scorch > 0) { ctx.fillStyle = `rgba(10,5,2,${scorch*0.65})`; ctx.fillRect(0, 0, W, H); }
+
+    // Roads fading
+    ctx.strokeStyle = `rgba(136,136,136,${1 - scorch*0.85})`; ctx.lineWidth = 12; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(0,200); ctx.lineTo(W,200); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(130,0); ctx.lineTo(130,H); ctx.stroke();
+
+    // Trees scorching
+    TREES.forEach(([tx,ty,tr]) => {
+      const d = Math.hypot(tx-BASE_X, ty-BASE_Y);
+      if (d < crtR*0.9) return;
+      const fade = Math.max(0, Math.min(1, (d - expR*0.5) / 60));
+      ctx.fillStyle = `rgba(45,106,36,${fade})`;
+      ctx.beginPath(); ctx.arc(tx, ty, tr, 0, Math.PI*2); ctx.fill();
+    });
+
+    // Nuclear fireball
+    if (expR > 0) {
+      const g = ctx.createRadialGradient(BASE_X, BASE_Y, 0, BASE_X, BASE_Y, expR);
+      g.addColorStop(0,   'rgba(255,255,255,1)');
+      g.addColorStop(0.08,'rgba(255,250,150,0.98)');
+      g.addColorStop(0.25,'rgba(255,160,0,0.88)');
+      g.addColorStop(0.5, 'rgba(255,60,0,0.65)');
+      g.addColorStop(0.8, 'rgba(160,20,0,0.3)');
+      g.addColorStop(1,   'rgba(40,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(BASE_X, BASE_Y, expR, 0, Math.PI*2); ctx.fill();
+      // 3 shockwave rings
+      for (let i = 0; i < 3; i++) {
+        ctx.strokeStyle = `rgba(255,220,80,${0.7-i*0.2})`; ctx.lineWidth = 2.5 - i*0.5;
+        ctx.beginPath(); ctx.arc(BASE_X, BASE_Y, expR*(0.35+i*0.32), 0, Math.PI*2); ctx.stroke();
+      }
+    }
+
+    // Crater
+    if (crtR > 0) {
+      const cg = ctx.createRadialGradient(BASE_X, BASE_Y, 0, BASE_X, BASE_Y, crtR);
+      cg.addColorStop(0,   '#030303');
+      cg.addColorStop(0.45,'#160805');
+      cg.addColorStop(0.75,'#2a1008');
+      cg.addColorStop(1,   'rgba(25,8,3,0)');
+      ctx.fillStyle = cg;
+      ctx.beginPath(); ctx.arc(BASE_X, BASE_Y, crtR, 0, Math.PI*2); ctx.fill();
+      // Smoke columns
+      for (let i = 0; i < 8; i++) {
+        const a = (i/8)*Math.PI*2, sr = crtR*(0.3+Math.sin(i)*0.4);
+        ctx.fillStyle = 'rgba(55,55,55,0.22)';
+        ctx.beginPath(); ctx.arc(BASE_X+Math.cos(a)*sr, BASE_Y+Math.sin(a)*sr, crtR*0.28, 0, Math.PI*2); ctx.fill();
+      }
+    }
+    // Fighter jet escaping (visible first 65% of animation)
+    if (t < 0.65) {
+      const jp = t / 0.65;
+      const jetX = BASE_X - 20 + jp * (W - BASE_X + 80);
+      const jetY = BASE_Y + 15 - jp * 100;
+      const mapAngle = Math.atan2(-100, W - BASE_X + 80); // heading angle
+      const sc = 0.72;
+      // Contrail ribbons from twin engines
+      const fade = 0.55 * (1 - jp);
+      ctx.save();
+      ctx.strokeStyle = `rgba(215,228,255,${fade})`; ctx.lineWidth = 2.5*sc;
+      ctx.lineCap = 'round';
+      for (const ey of [-3, 3]) {
+        const ex0 = jetX - 20*sc*Math.cos(mapAngle) - ey*sc*Math.sin(mapAngle);
+        const ey0 = jetY - 20*sc*Math.sin(mapAngle) + ey*sc*Math.cos(mapAngle);
+        const ex1 = jetX - 80*sc*Math.cos(mapAngle) - ey*sc*Math.sin(mapAngle);
+        const ey1 = jetY - 80*sc*Math.sin(mapAngle) + ey*sc*Math.cos(mapAngle);
+        ctx.beginPath(); ctx.moveTo(ex0, ey0); ctx.lineTo(ex1, ey1); ctx.stroke();
+      }
+      ctx.restore();
+      drawJetShape(ctx, jetX, jetY, sc, mapAngle);
+    }
+
+    // Compass
+    ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.arc(18,18,14,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ff4444'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('N',18,18);
+  }
+
+  function playBoom(power, big) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const duration = big ? 1.2 : 0.5;
+
+      // Noise burst
+      const bufSize = ctx.sampleRate * duration;
+      const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 1.5);
+      }
+
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+
+      const gainNode = ctx.createGain();
+      gainNode.gain.setValueAtTime(power / 100 * (big ? 1.5 : 1), ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(600 + power * 8, ctx.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + duration);
+
+      src.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      src.start();
+    } catch (e) { /* audio not supported */ }
+  }
+
+  function restart() {
+    tested.clear();
+    testing = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    countdownStart = null;
+    document.querySelectorAll('.bomb-card').forEach(c => c.classList.remove('tested', 'testing'));
+    document.getElementById('power-fill').style.width = '0%';
+    document.getElementById('power-label').textContent = 'Test a bomb to see its power!';
+    document.getElementById('ready-msg').textContent = '';
+    document.getElementById('mission-btn').style.display = 'none';
+    document.getElementById('mission-btn').innerHTML = '🕵️ SNEAK INTO THE BASE!';
+    document.getElementById('drop-btn').disabled = false;
+    document.getElementById('drop-btn').style.opacity = '1';
+    document.getElementById('drop-btn').style.display = 'block';
+    drawMap(0, 0);
+    show('screen-title');
+  }
+</script>
+</body>
+</html>
