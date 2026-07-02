@@ -1123,14 +1123,14 @@
   let gameOverTimeout = null;
 
   function onGameOver() {
-    cancelAnimationFrame(rafId); rafId=null;
+    if (gameOverTimeout) return;
     statusMsg='💀 YOU WERE CAUGHT! Restarting...'; statusTimer=200;
     gameOverTimeout = setTimeout(() => {
       gameOverTimeout = null;
       player={x:EXIT_X,y:EXIT_Y,angle:0}; playerHP=3;
       guards=makeGuards(); pBullets=[]; eBullets=[];
-      bombSwapped=false; gamePhase='sneak'; statusMsg=''; statusTimer=0;
-      rafId=requestAnimationFrame(gameLoop);
+      bombSwapped=false; gamePhase='sneak'; countdownStart=null;
+      statusMsg=''; statusTimer=0;
     }, 2200);
   }
 
@@ -1141,6 +1141,12 @@
   }
 
   function gameLoop() {
+    // Dead: freeze gameplay but keep drawing so the caught message shows
+    if (playerHP===0) {
+      drawBase();
+      rafId=requestAnimationFrame(gameLoop);
+      return;
+    }
     const speed=2; let dx=0,dy=0;
     if(keysHeld['ArrowLeft'] ||keysHeld['a']) dx=-speed;
     if(keysHeld['ArrowRight']||keysHeld['d']) dx=+speed;
